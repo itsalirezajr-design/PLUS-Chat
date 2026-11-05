@@ -4,7 +4,7 @@ compatibility_date = "2026-10-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "plus-chat-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "f9be81a3-3c03-4c7e-a2e5-4bd5a707fa0f"
 [[durable_objects.bindings]]
 name = "CHAT_ROOMS"
 class_name = "ChatRoom"
