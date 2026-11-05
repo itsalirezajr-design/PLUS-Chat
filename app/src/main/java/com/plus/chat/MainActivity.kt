@@ -95,7 +95,8 @@ class MainActivity : ComponentActivity() {
 fun PlusChatApp(prefs: android.content.SharedPreferences) {
     var token by remember { mutableStateOf(prefs.getString("token", null)) }
     var username by remember { mutableStateOf(prefs.getString("username", "") ?: "") }
-    var displayName by remember { mutableStateOf(prefs.getString("displayName", "") ?: "") }\n    var userId by remember { mutableStateOf(prefs.getString("userId", "") ?: "") }
+    var displayName by remember { mutableStateOf(prefs.getString("displayName", "") ?: "") }
+    var userId by remember { mutableStateOf(prefs.getString("userId", "") ?: "") }
     var page by remember { mutableStateOf(if (token == null) "welcome" else "chats") }
     var loginName by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -164,7 +165,8 @@ fun PlusChatApp(prefs: android.content.SharedPreferences) {
                                 val user = result.getJSONObject("user")
                                 username = user.getString("username")
                                 displayName = user.getString("displayName")
-                                prefs.edit().putString("token", token).putString("username", username).putString("displayName", displayName).apply()
+                                userId = user.getString("id")
+                                prefs.edit().putString("token", token).putString("username", username).putString("displayName", displayName).putString("userId", userId).apply()
                                 page = "chats"; password = ""; error = ""
                             } catch (e: Exception) { error = e.message ?: "ارتباط با سرور برقرار نشد" }
                             finally { busy = false }
