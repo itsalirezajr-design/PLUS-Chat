@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
 fun PlusChatApp(prefs: android.content.SharedPreferences) {
     var token by remember { mutableStateOf(prefs.getString("token", null)) }
     var username by remember { mutableStateOf(prefs.getString("username", "") ?: "") }
-    var displayName by remember { mutableStateOf(prefs.getString("displayName", "") ?: "") }
+    var displayName by remember { mutableStateOf(prefs.getString("displayName", "") ?: "") }\n    var userId by remember { mutableStateOf(prefs.getString("userId", "") ?: "") }
     var page by remember { mutableStateOf(if (token == null) "welcome" else "chats") }
     var loginName by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -113,7 +113,7 @@ fun PlusChatApp(prefs: android.content.SharedPreferences) {
 
     fun logout() {
         prefs.edit().clear().apply()
-        token = null; username = ""; displayName = ""; page = "welcome"; selectedId = null
+        token = null; username = ""; displayName = ""; userId = ""; page = "welcome"; selectedId = null
     }
     fun loadChats() {
         val t = token ?: return
@@ -172,7 +172,7 @@ fun PlusChatApp(prefs: android.content.SharedPreferences) {
                     }
                 )
                 selectedId != null -> ConversationScreen(
-                    title = selectedTitle, messages = messages, myUsername = username,
+                    title = selectedTitle, messages = messages, myUsername = userId,
                     value = messageInput, onValue = { messageInput = it }, error = error,
                     onBack = { selectedId = null; page = "chats" },
                     onSend = {
