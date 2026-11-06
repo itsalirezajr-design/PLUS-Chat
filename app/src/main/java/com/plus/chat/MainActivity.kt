@@ -63,7 +63,7 @@ private object PlusApi {
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
             val result = if (text.isBlank()) JSONObject() else JSONObject(text)
-            if (code !in 200..299) throw IllegalStateException(result.optString("error").ifBlank { "خطای سرور ($code)" })
+            if (code !in 200..299) { val message = result.optString("error").ifBlank { "خطای سرور ($code)" }; val debug = result.optString("debug"); throw IllegalStateException(if (debug.isNotBlank()) "$message — $debug" else message) }
             return result
         } finally { connection.disconnect() }
     }
