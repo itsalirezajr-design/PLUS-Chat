@@ -16,14 +16,47 @@ jobs:
   deploy:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: backend
-          command: deploy
+          node-version: "22"
+
+      - name: Deploy Worker with transient API retries
+        working-directory: backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set +e
+          for attempt in 1 2 3 4 5; do
+            echo "Cloudflare deployment attempt ${attempt}/5"
+            output_file="$(mktemp)"
+            npx --yes wrangler@3.90.0 deploy 2>&1 | tee "$output_file"
+            status=${PIPESTATUS[0]}
+
+            if [ "$status" -eq 0 ]; then
+              rm -f "$output_file"
+              echo "Cloudflare Worker deployed successfully."
+              exit 0
+            fi
+
+            if grep -Eqi '503|502|504|no healthy upstream|temporarily unavailable|ECONNRESET|ETIMEDOUT' "$output_file" && [ "$attempt" -lt 5 ]; then
+              delay=$((attempt * 20))
+              echo "Cloudflare API appears temporarily unavailable. Retrying in ${delay}s..."
+              rm -f "$output_file"
+              sleep "$delay"
+              continue
+            fi
+
+            echo "Deployment failed with a non-retryable error or all retries were exhausted."
+            rm -f "$output_file"
+            exit "$status"
+          done
+
+          exit 1
