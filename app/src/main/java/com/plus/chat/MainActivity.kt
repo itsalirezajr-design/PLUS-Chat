@@ -17,6 +17,18 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.PeopleAlt
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -110,6 +122,7 @@ fun PlusChatApp(prefs: android.content.SharedPreferences) {
     var messageInput by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf(listOf<JSONObject>()) }
+    var activeTab by remember { mutableStateOf("chats") }
     val scope = rememberCoroutineScope()
 
     fun logout() {
@@ -199,7 +212,7 @@ fun PlusChatApp(prefs: android.content.SharedPreferences) {
                         val t = token
                         if (t != null) scope.launch { try { val id = PlusApi.createConversation(t, peer); selectedId = id; selectedTitle = peer; searchResults = emptyList(); searchQuery = ""; loadChats() } catch (e: Exception) { error = e.message ?: "ساخت گفتگو ناموفق بود" } }
                     },
-                    onRefresh = { loadChats() }, onLogout = { logout() }
+                    onRefresh = { loadChats() }, onLogout = { logout() }, activeTab = activeTab, onTab = { activeTab = it }, onProfile = { activeTab = "profile" }
                 )
             }
         }
@@ -259,44 +272,166 @@ private fun AuthField(value: String, onValue: (String) -> Unit, label: String, i
 private fun ChatsScreen(
     name: String, chats: List<JSONObject>, searchQuery: String, searchResults: List<JSONObject>,
     error: String, onSearch: (String) -> Unit, onFind: () -> Unit,
-    onOpen: (String, String) -> Unit, onNewChat: (String) -> Unit, onRefresh: () -> Unit, onLogout: () -> Unit
+    onOpen: (String, String) -> Unit, onNewChat: (String) -> Unit, onRefresh: () -> Unit, onLogout: () -> Unit,
+    activeTab: String, onTab: (String) -> Unit, onProfile: () -> Unit
 ) {
+    var filter by remember { mutableStateOf("همه") }
+    var settingsNotice by remember { mutableStateOf("") }
+    val showSearch = searchQuery.isNotBlank() || searchResults.isNotEmpty()
     Column(Modifier.fillMaxSize().background(Navy)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 22.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { Text("PLUS CHAT", color = Cyan, fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold); Text("سلام، $name", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
-            Text("تازه‌سازی", color = Cyan, modifier = Modifier.clickable { onRefresh() }.padding(6.dp))
-            Text("خروج", color = Muted, modifier = Modifier.clickable { onLogout() }.padding(6.dp))
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 18.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("PLUS CHAT", color = Cyan, fontSize = 12.sp, letterSpacing = 2.4.sp, fontWeight = FontWeight.ExtraBold)
+                Text(when(activeTab) { "contacts" -> "مخاطبین"; "settings" -> "تنظیمات"; "profile" -> "حساب کاربری"; else -> "سلام، $name" },
+                    fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+            Box(Modifier.size(44.dp).background(Brush.linearGradient(listOf(Purple, Cyan)), CircleShape).clickable { onProfile() }, contentAlignment = Alignment.Center) {
+                Text(name.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Black, fontSize = 19.sp)
+            }
+            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, "تازه‌سازی", tint = Cyan) }
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(value = searchQuery, onValueChange = onSearch, modifier = Modifier.weight(1f), placeholder = { Text("جستجوی نام کاربری", color = Muted) }, leadingIcon = { Icon(Icons.Default.Search, null, tint = Muted) }, singleLine = true, shape = RoundedCornerShape(15.dp))
-            Spacer(Modifier.width(8.dp)); Button(onClick = onFind, colors = ButtonDefaults.buttonColors(containerColor = Purple)) { Text("جستجو") }
-        }
-        if (error.isNotEmpty()) Text(error, color = Color(0xFFFF8585), modifier = Modifier.padding(12.dp), fontSize = 12.sp)
-        if (searchResults.isNotEmpty()) {
-            Text("نتایج جستجو — برای شروع گفتگو انتخاب کن", color = Cyan, modifier = Modifier.padding(16.dp), fontSize = 13.sp)
-            LazyColumn(Modifier.weight(1f)) {
-                items(searchResults) { user ->
-                    val handle = user.optString("username")
-                    Row(Modifier.fillMaxWidth().clickable { onNewChat(handle) }.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(handle); Column(Modifier.padding(start = 12.dp)) { Text(user.optString("displayName"), fontWeight = FontWeight.Bold); Text("@$handle", color = Muted, fontSize = 12.sp) }
+        when(activeTab) {
+            "settings" -> {
+                Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp)) {
+                    Text("شخصی‌سازی و مدیریت حساب", color = Muted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 18.dp))
+                    SettingsRow(Icons.Default.Palette, "ظاهر برنامه", "تم تیره PLUS فعال است") { settingsNotice = "تم اختصاصی تیره PLUS فعال است." }
+                    SettingsRow(Icons.Default.Notifications, "اعلان‌ها", "مدیریت اعلان‌های گفتگو") { settingsNotice = "تنظیمات اعلان‌ها در نسخه بعدی اضافه می‌شود." }
+                    SettingsRow(Icons.Default.Lock, "حریم خصوصی و امنیت", "حساب با رمز عبور محافظت می‌شود") { settingsNotice = "ارتباط با سرور با نشست امن انجام می‌شود." }
+                    SettingsRow(Icons.Default.Info, "درباره PLUS Chat", "نسخه ۰.۱ • پیام‌رسان اختصاصی PLUS") { settingsNotice = "PLUS Chat؛ ارتباط ساده، سریع و اختصاصی." }
+                    if(settingsNotice.isNotBlank()) Text(settingsNotice, color = Cyan, modifier = Modifier.padding(12.dp), fontSize = 13.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = onLogout, modifier = Modifier.fillMaxWidth().height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B2034)), shape = RoundedCornerShape(16.dp)) { Text("خروج از حساب") }
+                }
+            }
+            "profile" -> {
+                Column(Modifier.weight(1f).fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.size(104.dp).background(Brush.linearGradient(listOf(Purple, Cyan)), CircleShape), contentAlignment = Alignment.Center) {
+                        Text(name.take(1).uppercase(), color = Color.White, fontSize = 42.sp, fontWeight = FontWeight.Black)
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(name, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                    Text("حساب PLUS Chat", color = Cyan, fontSize = 13.sp)
+                    Spacer(Modifier.height(24.dp))
+                    ProfileInfo("نام نمایشی", name)
+                    ProfileInfo("وضعیت حساب", "فعال")
+                    ProfileInfo("شناسه پیام‌رسان", "محافظت‌شده")
+                    Spacer(Modifier.height(18.dp))
+                    OutlinedButton(onClick = { onTab("settings") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) { Text("تنظیمات حساب") }
+                }
+            }
+            else -> {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    OutlinedTextField(value = searchQuery, onValueChange = onSearch, modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text(if(activeTab == "contacts") "جستجوی افراد با نام کاربری" else "جستجو در گفتگوها و کاربران", color = Muted) },
+                        leadingIcon = { Icon(Icons.Default.Search, null, tint = Muted) }, trailingIcon = {
+                            if(searchQuery.isNotBlank()) IconButton(onClick = { onSearch(""); }) { Icon(Icons.Default.Close, "پاک کردن", tint = Muted) }
+                        }, singleLine = true, shape = RoundedCornerShape(18.dp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple, unfocusedBorderColor = Color(0xFF303B56), focusedTextColor = Color.White, unfocusedTextColor = Color.White, cursorColor = Cyan))
+                    Spacer(Modifier.height(13.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("همه", "خوانده‌نشده", "گروه‌ها").forEach { item ->
+                            val selected = filter == item
+                            Surface(onClick = { filter = item }, shape = RoundedCornerShape(50), color = if(selected) Purple.copy(alpha=.22f) else Panel,
+                                border = if(selected) androidx.compose.foundation.BorderStroke(1.dp, Purple.copy(alpha=.6f)) else null) {
+                                Text(item, modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp), color = if(selected) Color.White else Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        Spacer(Modifier.weight(1f))
+                        Text(if(activeTab == "contacts") "یافتن افراد" else "＋ گفتگوی جدید", color = Cyan, modifier = Modifier.clickable { onFind() }.padding(vertical = 9.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                if(error.isNotEmpty()) Text(error, color = Color(0xFFFF8585), modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp), fontSize = 12.sp)
+                if(showSearch && searchResults.isNotEmpty()) {
+                    Text("نتایج جستجو", color = Muted, modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 6.dp), fontSize = 12.sp)
+                    LazyColumn(Modifier.weight(1f)) {
+                        items(searchResults) { user ->
+                            val handle=user.optString("username"); val title=user.optString("displayName",handle)
+                            Row(Modifier.fillMaxWidth().clickable { onNewChat(handle) }.padding(horizontal=20.dp, vertical=12.dp), verticalAlignment=Alignment.CenterVertically) {
+                                Avatar(title)
+                                Column(Modifier.weight(1f).padding(start=13.dp)) { Text(title, color=Color.White, fontWeight=FontWeight.SemiBold); Text("@$handle", color=Muted, fontSize=12.sp) }
+                                Icon(Icons.Default.ChatBubbleOutline, null, tint=Cyan)
+                            }
+                            HorizontalDivider(color=Color(0xFF202B45), modifier=Modifier.padding(start=82.dp))
+                        }
+                    }
+                } else if(showSearch) {
+                    Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment=Alignment.CenterHorizontally, verticalArrangement=Arrangement.Center) {
+                        Icon(Icons.Default.PersonSearch, null, tint=Muted, modifier=Modifier.size(42.dp))
+                        Text("برای جستجو، دکمه «یافتن افراد» را بزن", color=Muted, fontSize=13.sp)
+                    }
+                } else if(activeTab == "contacts") {
+                    Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment=Alignment.CenterHorizontally, verticalArrangement=Arrangement.Center) {
+                        Icon(Icons.Default.PeopleAlt, null, tint=Purple, modifier=Modifier.size(54.dp))
+                        Spacer(Modifier.height(12.dp))
+                        Text("مخاطبین PLUS", fontSize=19.sp, fontWeight=FontWeight.Bold)
+                        Text("نام کاربری دوستت را جستجو کن و گفتگو را شروع کن", color=Muted, fontSize=12.sp, modifier=Modifier.padding(14.dp))
+                        Button(onClick=onFind, colors=ButtonDefaults.buttonColors(containerColor=Purple), shape=RoundedCornerShape(14.dp)) { Text("جستجوی کاربران") }
+                    }
+                } else if(chats.isEmpty()) {
+                    Column(Modifier.weight(1f).fillMaxWidth().padding(28.dp), horizontalAlignment=Alignment.CenterHorizontally, verticalArrangement=Arrangement.Center) {
+                        Box(Modifier.size(94.dp).background(Brush.linearGradient(listOf(Purple.copy(alpha=.25f), Cyan.copy(alpha=.12f))), CircleShape), contentAlignment=Alignment.Center) {
+                            Icon(Icons.Default.Forum, null, tint=Cyan, modifier=Modifier.size(44.dp))
+                        }
+                        Spacer(Modifier.height(20.dp))
+                        Text("هنوز گفتگویی نداری", fontSize=20.sp, fontWeight=FontWeight.Bold)
+                        Text("اولین گفتگوی خودت را در PLUS شروع کن.", color=Muted, fontSize=13.sp, modifier=Modifier.padding(top=8.dp, bottom=18.dp))
+                        Button(onClick={ onTab("contacts") }, colors=ButtonDefaults.buttonColors(containerColor=Purple), shape=RoundedCornerShape(15.dp)) { Text("پیدا کردن دوستان") }
+                    }
+                } else {
+                    LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding=PaddingValues(top=10.dp, bottom=12.dp)) {
+                        items(chats) { chat ->
+                            val title=chat.optString("displayName",chat.optString("username"))
+                            Row(Modifier.fillMaxWidth().clickable { onOpen(chat.optString("id"),title) }.padding(horizontal=18.dp, vertical=12.dp), verticalAlignment=Alignment.CenterVertically) {
+                                Avatar(title)
+                                Column(Modifier.weight(1f).padding(start=13.dp)) {
+                                    Text(title, color=Color.White, fontWeight=FontWeight.SemiBold, fontSize=15.sp)
+                                    Spacer(Modifier.height(5.dp))
+                                    Text(chat.optString("lastMessage","برای شروع گفتگو لمس کن"), color=Muted, fontSize=12.sp, maxLines=1)
+                                }
+                                Text("›", color=Muted, fontSize=25.sp)
+                            }
+                            HorizontalDivider(color=Color(0xFF202B45), modifier=Modifier.padding(start=82.dp))
+                        }
                     }
                 }
             }
-        } else {
-            Text("گفتگوهای تو", modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            if (chats.isEmpty()) Text("هنوز گفتگویی نداری؛ نام کاربری دوستت را جستجو کن.", color = Muted, modifier = Modifier.padding(20.dp), fontSize = 13.sp)
-            LazyColumn(Modifier.weight(1f)) {
-                items(chats) { chat ->
-                    val title = chat.optString("displayName", chat.optString("username"))
-                    Row(Modifier.fillMaxWidth().clickable { onOpen(chat.optString("id"), title) }.padding(horizontal = 18.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(title)
-                        Column(Modifier.weight(1f).padding(start = 13.dp)) { Text(title, fontWeight = FontWeight.SemiBold); Spacer(Modifier.height(4.dp)); Text(chat.optString("lastMessage", "گفتگو را باز کن"), color = Muted, fontSize = 12.sp) }
-                    }
-                    HorizontalDivider(color = Color(0xFF202B45), modifier = Modifier.padding(start = 82.dp))
-                }
-            }
+        }
+        Row(Modifier.fillMaxWidth().padding(horizontal=14.dp, vertical=9.dp).background(Panel, RoundedCornerShape(24.dp)).padding(vertical=5.dp), horizontalArrangement=Arrangement.SpaceAround, verticalAlignment=Alignment.CenterVertically) {
+            BottomItem(Icons.Default.Chat, "گفتگوها", activeTab=="chats") { onTab("chats") }
+            BottomItem(Icons.Default.PeopleAlt, "مخاطبین", activeTab=="contacts") { onTab("contacts") }
+            BottomItem(Icons.Default.Settings, "تنظیمات", activeTab=="settings") { onTab("settings") }
+            BottomItem(Icons.Default.AccountCircle, "پروفایل", activeTab=="profile") { onTab("profile") }
         }
     }
+}
+
+@Composable
+private fun BottomItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
+    Column(Modifier.clickable(onClick=onClick).padding(horizontal=10.dp, vertical=7.dp), horizontalAlignment=Alignment.CenterHorizontally) {
+        Icon(icon, null, tint=if(selected) Cyan else Muted, modifier=Modifier.size(22.dp))
+        Spacer(Modifier.height(3.dp))
+        Text(label, color=if(selected) Color.White else Muted, fontSize=10.sp, fontWeight=if(selected) FontWeight.Bold else FontWeight.Normal)
+    }
+}
+
+@Composable
+private fun SettingsRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick=onClick).padding(vertical=15.dp), verticalAlignment=Alignment.CenterVertically) {
+        Box(Modifier.size(44.dp).background(Purple.copy(alpha=.16f), RoundedCornerShape(14.dp)), contentAlignment=Alignment.Center) { Icon(icon, null, tint=Cyan) }
+        Column(Modifier.weight(1f).padding(start=13.dp)) { Text(title, color=Color.White, fontWeight=FontWeight.SemiBold); Text(subtitle, color=Muted, fontSize=11.sp) }
+        Text("›", color=Muted, fontSize=22.sp)
+    }
+    HorizontalDivider(color=Color(0xFF202B45))
+}
+
+@Composable
+private fun ProfileInfo(title: String, value: String) {
+    Row(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(14.dp)).padding(15.dp), verticalAlignment=Alignment.CenterVertically) {
+        Text(title, color=Muted, fontSize=12.sp, modifier=Modifier.weight(1f))
+        Text(value, color=Color.White, fontSize=13.sp, fontWeight=FontWeight.SemiBold)
+    }
+    Spacer(Modifier.height(8.dp))
 }
 
 @Composable
