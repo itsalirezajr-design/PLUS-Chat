@@ -285,6 +285,7 @@ private fun ChatsScreen(
     var groupMembers by remember { mutableStateOf("") }
     var settingsNotice by remember { mutableStateOf("") }
     val showSearch = searchQuery.isNotBlank() || searchResults.isNotEmpty()
+    val visibleChats = chats.filter { filter != "گروه‌ها" || it.optString("kind") == "group" }
     if(groupDialog) {
         AlertDialog(
             onDismissRequest = { groupDialog = false },
@@ -352,7 +353,7 @@ private fun ChatsScreen(
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple, unfocusedBorderColor = Color(0xFF303B56), focusedTextColor = Color.White, unfocusedTextColor = Color.White, cursorColor = Cyan))
                     Spacer(Modifier.height(13.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("همه", "خوانده‌نشده", "گروه‌ها").forEach { item ->
+                        listOf("همه", "گروه‌ها").forEach { item ->
                             val selected = filter == item
                             Surface(onClick = { filter = item }, shape = RoundedCornerShape(50), color = if(selected) Purple.copy(alpha=.22f) else Panel,
                                 border = if(selected) androidx.compose.foundation.BorderStroke(1.dp, Purple.copy(alpha=.6f)) else null) {
@@ -402,7 +403,7 @@ private fun ChatsScreen(
                     }
                 } else {
                     LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding=PaddingValues(top=10.dp, bottom=12.dp)) {
-                        items(chats) { chat ->
+                        items(visibleChats) { chat ->
                             val title=chat.optString("displayName",chat.optString("username"))
                             Row(Modifier.fillMaxWidth().clickable { onOpen(chat.optString("id"),title) }.padding(horizontal=18.dp, vertical=12.dp), verticalAlignment=Alignment.CenterVertically) {
                                 Avatar(title)
