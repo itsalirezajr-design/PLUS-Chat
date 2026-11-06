@@ -90,6 +90,10 @@ private object PlusApi {
     suspend fun createConversation(token: String, username: String) = withContext(Dispatchers.IO) {
         request("/conversations", "POST", token, JSONObject().put("username", username)).getString("conversationId")
     }
+    suspend fun createGroup(token: String, title: String, usernames: List<String>) = withContext(Dispatchers.IO) {
+        val members = JSONArray(); usernames.forEach { members.put(it) }
+        request("/groups", "POST", token, JSONObject().put("title", title).put("usernames", members)).getString("conversationId")
+    }
     suspend fun messages(token: String, id: String) = withContext(Dispatchers.IO) { request("/conversations/$id/messages", token = token).optJSONArray("messages") ?: JSONArray() }
     suspend fun send(token: String, id: String, body: String) = withContext(Dispatchers.IO) {
         request("/conversations/$id/messages", "POST", token, JSONObject().put("body", body))
@@ -212,7 +216,7 @@ fun PlusChatApp(prefs: android.content.SharedPreferences) {
                         val t = token
                         if (t != null) scope.launch { try { val id = PlusApi.createConversation(t, peer); selectedId = id; selectedTitle = peer; searchResults = emptyList(); searchQuery = ""; loadChats() } catch (e: Exception) { error = e.message ?: "ساخت گفتگو ناموفق بود" } }
                     },
-                    onRefresh = { loadChats() }, onLogout = { logout() }, activeTab = activeTab, onTab = { activeTab = it }, onProfile = { activeTab = "profile" }
+                    onRefresh = { loadChats() }, onLogout = { logout() }, activeTab = activeTab, onTab = { activeTab = it }, onProfile = { activeTab = "profile" }, onCreateGroup = { title, members -> val t = token; if (t != null) scope.launch { try { val id = PlusApi.createGroup(t, title, members); selectedId = id; selectedTitle = title; loadChats(); error = "" } catch (e: Exception) { error = e.message ?: "ساخت گروه ناموفق بود" } } }
                 )
             }
         }
@@ -273,11 +277,29 @@ private fun ChatsScreen(
     name: String, chats: List<JSONObject>, searchQuery: String, searchResults: List<JSONObject>,
     error: String, onSearch: (String) -> Unit, onFind: () -> Unit,
     onOpen: (String, String) -> Unit, onNewChat: (String) -> Unit, onRefresh: () -> Unit, onLogout: () -> Unit,
-    activeTab: String, onTab: (String) -> Unit, onProfile: () -> Unit
+    activeTab: String, onTab: (String) -> Unit, onProfile: () -> Unit, onCreateGroup: (String, List<String>) -> Unit
 ) {
     var filter by remember { mutableStateOf("همه") }
+    var groupDialog by remember { mutableStateOf(false) }
+    var groupTitle by remember { mutableStateOf("") }
+    var groupMembers by remember { mutableStateOf("") }
     var settingsNotice by remember { mutableStateOf("") }
     val showSearch = searchQuery.isNotBlank() || searchResults.isNotEmpty()
+    if(groupDialog) {
+        AlertDialog(
+            onDismissRequest = { groupDialog = false },
+            title = { Text("ساخت گروه جدید", color = Color.White) },
+            text = { Column {
+                OutlinedTextField(value=groupTitle,onValueChange={groupTitle=it},label={Text("نام گروه")},singleLine=true)
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(value=groupMembers,onValueChange={groupMembers=it},label={Text("نام کاربری اعضا")},placeholder={Text("مثلاً ali, sara")},minLines=2)
+                Text("نام کاربری اعضا را با ویرگول جدا کن. خودت به‌صورت خودکار عضو گروه می‌شوی.",color=Muted,fontSize=11.sp,modifier=Modifier.padding(top=8.dp))
+            } },
+            confirmButton = { TextButton(onClick = { val members=groupMembers.split(",", "،", "\\n").map{it.trim().removePrefix("@")}.filter{it.isNotBlank()}.distinct(); if(groupTitle.isNotBlank() && members.isNotEmpty()){onCreateGroup(groupTitle.trim(),members);groupDialog=false;groupTitle="";groupMembers=""} }) { Text("ساخت گروه") } },
+            dismissButton = { TextButton(onClick={groupDialog=false}) { Text("انصراف") } },
+            containerColor = Panel, titleContentColor = Color.White, textContentColor = Muted
+        )
+    }
     Column(Modifier.fillMaxSize().background(Navy)) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 18.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -338,7 +360,7 @@ private fun ChatsScreen(
                             }
                         }
                         Spacer(Modifier.weight(1f))
-                        Text(if(activeTab == "contacts") "یافتن افراد" else "＋ گفتگوی جدید", color = Cyan, modifier = Modifier.clickable { onFind() }.padding(vertical = 9.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(if(activeTab == "contacts") "یافتن افراد" else "＋ گروه جدید", color = Cyan, modifier = Modifier.clickable { if(activeTab == "contacts") onFind() else groupDialog = true }.padding(vertical = 9.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 if(error.isNotEmpty()) Text(error, color = Color(0xFFFF8585), modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp), fontSize = 12.sp)
@@ -386,6 +408,8 @@ private fun ChatsScreen(
                                 Avatar(title)
                                 Column(Modifier.weight(1f).padding(start=13.dp)) {
                                     Text(title, color=Color.White, fontWeight=FontWeight.SemiBold, fontSize=15.sp)
+                                    Spacer(Modifier.height(3.dp))
+                                    if(chat.optString("kind")=="group") Text("گروه • ${chat.optInt("memberCount")} عضو", color=Cyan, fontSize=10.sp)
                                     Spacer(Modifier.height(5.dp))
                                     Text(chat.optString("lastMessage","برای شروع گفتگو لمس کن"), color=Muted, fontSize=12.sp, maxLines=1)
                                 }
